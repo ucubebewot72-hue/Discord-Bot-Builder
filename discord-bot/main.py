@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import sys
@@ -5,9 +6,11 @@ from datetime import timedelta
 
 import aiohttp
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import db
+
+VOICE_CHANNEL_NAME = "kaine"
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
@@ -57,10 +60,39 @@ async def send_dm(user, **kwargs):
         print(f"DM hatası → {user}: {e}")
 
 
+async def join_kaine():
+    for guild in bot.guilds:
+        channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
+        if channel:
+            vc = guild.voice_client
+            if vc and vc.is_connected():
+                if vc.channel.id != channel.id:
+                    await vc.move_to(channel)
+            else:
+                try:
+                    await channel.connect()
+                    print(f"'{VOICE_CHANNEL_NAME}' ses kanalına bağlanıldı ({guild.name})")
+                except Exception as e:
+                    print(f"Ses kanalına bağlanılamadı ({guild.name}): {e}")
+
+
+@tasks.loop(seconds=30)
+async def voice_keepalive():
+    await join_kaine()
+
+
+@voice_keepalive.before_loop
+async def before_keepalive():
+    await bot.wait_until_ready()
+
+
 @bot.event
 async def on_ready():
     db.init_db()
     await download_ban_gif()
+    await join_kaine()
+    if not voice_keepalive.is_running():
+        voice_keepalive.start()
     print(f"Bot hazır — {bot.user} olarak giriş yapıldı (ID: {bot.user.id})")
     print("------")
 
