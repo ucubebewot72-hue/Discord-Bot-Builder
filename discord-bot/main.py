@@ -229,6 +229,38 @@ async def warn_error(ctx, error):
         await ctx.send("k warn user id reason")
 
 
+@bot.command(name="del")
+@commands.has_permissions(manage_messages=True)
+async def del_cmd(ctx, amount: int):
+    try:
+        deleted = await ctx.channel.purge(limit=amount + 1)
+        try:
+            await ctx.author.send(f"✅ {len(deleted) - 1} mesaj silindi.")
+        except discord.Forbidden:
+            pass
+    except discord.Forbidden:
+        try:
+            await ctx.author.send("❌ Mesaj silme yetkim yok.")
+        except discord.Forbidden:
+            pass
+    except Exception as e:
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
+
+
+@del_cmd.error
+async def del_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("k del number")
+
+
 @bot.command(name="top")
 async def top_cmd(ctx):
     top_messages = db.get_top_messages(ctx.guild.id, limit=5)
