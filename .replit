@@ -49,3 +49,8 @@ externalPort = 80
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+DISCORD_TOKEN = "MTUxMTQyMjg0OTUyNzcwOTcxNg.GZxWvh.wOm9M2c39saSNuqlUK8ejBGvDKScLBj29arv1s"
