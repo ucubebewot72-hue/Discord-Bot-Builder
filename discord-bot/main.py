@@ -70,7 +70,7 @@ async def on_message(message):
         return
     db.increment_messages(message.guild.id, message.author.id, str(message.author))
     if "kaan" in message.content.lower():
-        await message.reply("götelek")
+        await message.reply("mal")
     await bot.process_commands(message)
 
 
