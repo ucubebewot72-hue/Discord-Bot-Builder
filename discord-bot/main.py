@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import timedelta
 
+import aiohttp
 import discord
 from discord.ext import commands
 
@@ -11,7 +12,8 @@ TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
     sys.exit("HATA: DISCORD_TOKEN ortam değişkeni ayarlanmamış.")
 
-BAN_GIF = "https://tenor.com/view/anime-luminous-luminus-luminas-valentine-gif-2480934953542931736"
+TENOR_PAGE_URL = "https://tenor.com/view/anime-luminous-luminus-luminas-valentine-gif-2480934953542931736"
+BAN_GIF_PATH = "ban.gif"
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,9 +23,43 @@ intents.voice_states = True
 bot = commands.Bot(command_prefix="k ", intents=intents)
 
 
+async def download_ban_gif():
+    import re
+    import os
+
+    if os.path.exists(BAN_GIF_PATH):
+        print("GIF zaten mevcut, tekrar indirilmedi.")
+        return
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Tenor sayfasından direkt medya URL'ini çek
+            async with session.get(TENOR_PAGE_URL) as resp:
+                html = await resp.text()
+
+            # og:image veya content URL'ini bul
+            match = re.search(r'"url"\s*:\s*"(https://media\.tenor\.com/[^"]+\.gif)"', html)
+            if not match:
+                match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
+
+            if match:
+                gif_url = match.group(1)
+                async with session.get(gif_url) as gif_resp:
+                    if gif_resp.status == 200:
+                        with open(BAN_GIF_PATH, "wb") as f:
+                            f.write(await gif_resp.read())
+                        print(f"GIF indirildi: {gif_url}")
+                        return
+
+        print("GIF indirilemedi, URL bulunamadı.")
+    except Exception as e:
+        print(f"GIF indirme hatası: {e}")
+
+
 @bot.event
 async def on_ready():
     db.init_db()
+    await download_ban_gif()
     print(f"Bot hazır — {bot.user} olarak giriş yapıldı (ID: {bot.user.id})")
     print("------")
 
@@ -54,13 +90,20 @@ async def ban_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
         user = await bot.fetch_user(user_id)
         await ctx.guild.ban(user, reason=reason)
 
+        import os
         embed = discord.Embed(title="Kullanıcı Banlandı", color=discord.Color.red())
         embed.add_field(name="Kullanıcı", value=f"{user} (ID: `{user_id}`)", inline=False)
         embed.add_field(name="Sebep", value=reason, inline=False)
 
         try:
-            await ctx.author.send(embed=embed)
-            await ctx.author.send(BAN_GIF)
+            if os.path.exists(BAN_GIF_PATH):
+                embed.set_image(url="attachment://ban.gif")
+                await ctx.author.send(
+                    embed=embed,
+                    file=discord.File(BAN_GIF_PATH, filename="ban.gif"),
+                )
+            else:
+                await ctx.author.send(embed=embed)
         except discord.Forbidden:
             pass
 
