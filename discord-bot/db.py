@@ -29,6 +29,18 @@ def init_db():
                 PRIMARY KEY (guild_id, user_id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS warnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT,
+                user_id TEXT,
+                username TEXT,
+                moderator_id TEXT,
+                moderator_name TEXT,
+                reason TEXT,
+                timestamp REAL
+            )
+        """)
         conn.commit()
 
 
@@ -82,6 +94,38 @@ def record_voice_leave(guild_id, user_id):
                 (elapsed, str(guild_id), str(user_id)),
             )
             conn.commit()
+
+
+def add_warning(guild_id, user_id, username, moderator_id, moderator_name, reason):
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO warnings (guild_id, user_id, username, moderator_id, moderator_name, reason, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                str(guild_id),
+                str(user_id),
+                username,
+                str(moderator_id),
+                moderator_name,
+                reason,
+                time.time(),
+            ),
+        )
+        conn.commit()
+
+
+def get_warnings(guild_id, user_id):
+    with get_conn() as conn:
+        return conn.execute(
+            """
+            SELECT reason, moderator_name, timestamp FROM warnings
+            WHERE guild_id = ? AND user_id = ?
+            ORDER BY timestamp DESC
+        """,
+            (str(guild_id), str(user_id)),
+        ).fetchall()
 
 
 def get_top_messages(guild_id, limit=5):

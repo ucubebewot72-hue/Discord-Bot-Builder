@@ -11,6 +11,8 @@ TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
     sys.exit("ERROR: DISCORD_TOKEN environment variable is not set.")
 
+BAN_GIF = "https://tenor.com/view/anime-luminous-luminus-luminas-valentine-gif-2480934953542931736"
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -51,13 +53,31 @@ async def ban_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
     try:
         user = await bot.fetch_user(user_id)
         await ctx.guild.ban(user, reason=reason)
-        await ctx.send(f"✅ Banned **{user}** (ID: `{user_id}`)\nReason: {reason}")
+
+        embed = discord.Embed(title="User Banned", color=discord.Color.red())
+        embed.add_field(name="User", value=f"{user} (ID: `{user_id}`)", inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+
+        try:
+            await ctx.author.send(embed=embed)
+            await ctx.author.send(BAN_GIF)
+        except discord.Forbidden:
+            pass
+
     except discord.NotFound:
         await ctx.send(f"❌ No user found with ID `{user_id}`.")
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to ban this user.")
     except Exception as e:
         await ctx.send(f"❌ Error: {e}")
+
+
+@ban_cmd.error
+async def ban_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("Usage: k ban user id")
 
 
 @bot.command(name="kick")
@@ -75,6 +95,14 @@ async def kick_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
         await ctx.send(f"❌ Error: {e}")
 
 
+@kick_cmd.error
+async def kick_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("Usage: k kick user id")
+
+
 @bot.command(name="mute")
 @commands.has_permissions(moderate_members=True)
 async def mute_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
@@ -90,6 +118,45 @@ async def mute_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
         await ctx.send("❌ I don't have permission to timeout this user.")
     except Exception as e:
         await ctx.send(f"❌ Error: {e}")
+
+
+@mute_cmd.error
+async def mute_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("Usage: k mute user id")
+
+
+@bot.command(name="warn")
+@commands.has_permissions(moderate_members=True)
+async def warn_cmd(ctx, user_id: int, *, reason: str):
+    try:
+        member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
+        db.add_warning(
+            ctx.guild.id,
+            user_id,
+            str(member),
+            ctx.author.id,
+            str(ctx.author),
+            reason,
+        )
+        warnings = db.get_warnings(ctx.guild.id, user_id)
+        await ctx.send(
+            f"⚠️ Warned **{member}** (ID: `{user_id}`)\nReason: {reason}\nTotal warnings: **{len(warnings)}**"
+        )
+    except discord.NotFound:
+        await ctx.send(f"❌ No member found with ID `{user_id}` in this server.")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {e}")
+
+
+@warn_cmd.error
+async def warn_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("Usage: k warn user id reason")
 
 
 @bot.command(name="top")
@@ -128,18 +195,6 @@ async def top_cmd(ctx):
         )
 
     await ctx.send(embed=embed)
-
-
-@ban_cmd.error
-@kick_cmd.error
-@mute_cmd.error
-async def mod_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send("❌ Please provide a valid user ID (numbers only).")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument. Usage: `k {ctx.command.name} <user_id>`")
 
 
 bot.run(TOKEN)
