@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from datetime import timedelta
 
@@ -24,24 +25,16 @@ bot = commands.Bot(command_prefix="k ", intents=intents)
 
 
 async def download_ban_gif():
-    import re
-    import os
-
     if os.path.exists(BAN_GIF_PATH):
         print("GIF zaten mevcut, tekrar indirilmedi.")
         return
-
     try:
         async with aiohttp.ClientSession() as session:
-            # Tenor sayfasından direkt medya URL'ini çek
             async with session.get(TENOR_PAGE_URL) as resp:
                 html = await resp.text()
-
-            # og:image veya content URL'ini bul
             match = re.search(r'"url"\s*:\s*"(https://media\.tenor\.com/[^"]+\.gif)"', html)
             if not match:
                 match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
-
             if match:
                 gif_url = match.group(1)
                 async with session.get(gif_url) as gif_resp:
@@ -50,10 +43,18 @@ async def download_ban_gif():
                             f.write(await gif_resp.read())
                         print(f"GIF indirildi: {gif_url}")
                         return
-
         print("GIF indirilemedi, URL bulunamadı.")
     except Exception as e:
         print(f"GIF indirme hatası: {e}")
+
+
+async def send_dm(user, **kwargs):
+    try:
+        await user.send(**kwargs)
+    except discord.Forbidden:
+        print(f"DM gönderilemedi → {user} (DM kapalı veya engellendi)")
+    except Exception as e:
+        print(f"DM hatası → {user}: {e}")
 
 
 @bot.event
@@ -76,12 +77,9 @@ async def on_message(message):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    joined = before.channel is None and after.channel is not None
-    left = before.channel is not None and after.channel is None
-
-    if joined:
+    if before.channel is None and after.channel is not None:
         db.record_voice_join(member.guild.id, member.id, str(member))
-    elif left:
+    elif before.channel is not None and after.channel is None:
         db.record_voice_leave(member.guild.id, member.id)
 
 
@@ -91,48 +89,34 @@ async def ban_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         user = await bot.fetch_user(user_id)
         await ctx.guild.ban(user, reason=reason)
+        await ctx.message.add_reaction("✅")
 
-        import os
         embed = discord.Embed(title="Kullanıcı Banlandı", color=discord.Color.red())
         embed.add_field(name="Kullanıcı", value=f"{user} (ID: `{user_id}`)", inline=False)
         embed.add_field(name="Sebep", value=reason, inline=False)
 
-        try:
-            if os.path.exists(BAN_GIF_PATH):
-                embed.set_image(url="attachment://ban.gif")
-                await ctx.author.send(
-                    embed=embed,
-                    file=discord.File(BAN_GIF_PATH, filename="ban.gif"),
-                )
-            else:
-                await ctx.author.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        if os.path.exists(BAN_GIF_PATH):
+            embed.set_image(url="attachment://ban.gif")
+            await send_dm(
+                ctx.author,
+                embed=embed,
+                file=discord.File(BAN_GIF_PATH, filename="ban.gif"),
+            )
+        else:
+            await send_dm(ctx.author, embed=embed)
 
     except discord.NotFound:
-        try:
-            await ctx.author.send(f"❌ `{user_id}` ID'li bir kullanıcı bulunamadı.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ `{user_id}` ID'li bir kullanıcı bulunamadı.")
     except discord.Forbidden:
-        try:
-            await ctx.author.send("❌ Bu kullanıcıyı banlama yetkim yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu kullanıcıyı banlama yetkim yok.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @ban_cmd.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k ban user id")
 
@@ -143,39 +127,24 @@ async def unban_cmd(ctx, user_id: int):
     try:
         user = await bot.fetch_user(user_id)
         await ctx.guild.unban(user)
+        await ctx.message.add_reaction("✅")
 
         embed = discord.Embed(title="Ban Kaldırıldı", color=discord.Color.green())
         embed.add_field(name="Kullanıcı", value=f"{user} (ID: `{user_id}`)", inline=False)
-
-        try:
-            await ctx.author.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, embed=embed)
 
     except discord.NotFound:
-        try:
-            await ctx.author.send(f"❌ `{user_id}` ID'li kullanıcı banlanmış listesinde bulunamadı.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ `{user_id}` ID'li kullanıcı banlanmış listesinde bulunamadı.")
     except discord.Forbidden:
-        try:
-            await ctx.author.send("❌ Bu kullanıcının banını kaldırma yetkim yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu kullanıcının banını kaldırma yetkim yok.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @unban_cmd.error
 async def unban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k unban user id")
 
@@ -186,40 +155,25 @@ async def kick_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
         await member.kick(reason=reason)
+        await ctx.message.add_reaction("✅")
 
         embed = discord.Embed(title="Kullanıcı Atıldı", color=discord.Color.orange())
         embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
         embed.add_field(name="Sebep", value=reason, inline=False)
-
-        try:
-            await ctx.author.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, embed=embed)
 
     except discord.NotFound:
-        try:
-            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
     except discord.Forbidden:
-        try:
-            await ctx.author.send("❌ Bu kullanıcıyı atma yetkim yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu kullanıcıyı atma yetkim yok.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @kick_cmd.error
 async def kick_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k kick user id")
 
@@ -230,41 +184,26 @@ async def mute_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
         await member.timeout(timedelta(hours=1), reason=reason)
+        await ctx.message.add_reaction("✅")
 
         embed = discord.Embed(title="Kullanıcı Susturuldu", color=discord.Color.blue())
         embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
         embed.add_field(name="Süre", value="1 saat", inline=False)
         embed.add_field(name="Sebep", value=reason, inline=False)
-
-        try:
-            await ctx.author.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, embed=embed)
 
     except discord.NotFound:
-        try:
-            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
     except discord.Forbidden:
-        try:
-            await ctx.author.send("❌ Bu kullanıcıyı susturma yetkim yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu kullanıcıyı susturma yetkim yok.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @mute_cmd.error
 async def mute_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k mute user id")
 
@@ -274,45 +213,26 @@ async def mute_error(ctx, error):
 async def warn_cmd(ctx, user_id: int, *, reason: str):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
-        db.add_warning(
-            ctx.guild.id,
-            user_id,
-            str(member),
-            ctx.author.id,
-            str(ctx.author),
-            reason,
-        )
+        db.add_warning(ctx.guild.id, user_id, str(member), ctx.author.id, str(ctx.author), reason)
         warnings = db.get_warnings(ctx.guild.id, user_id)
+        await ctx.message.add_reaction("✅")
 
         embed = discord.Embed(title="Kullanıcı Uyarıldı", color=discord.Color.yellow())
         embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
         embed.add_field(name="Sebep", value=reason, inline=False)
         embed.add_field(name="Toplam Uyarı", value=str(len(warnings)), inline=False)
-
-        try:
-            await ctx.author.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, embed=embed)
 
     except discord.NotFound:
-        try:
-            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @warn_cmd.error
 async def warn_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k warn user id reason")
 
@@ -322,29 +242,17 @@ async def warn_error(ctx, error):
 async def del_cmd(ctx, amount: int):
     try:
         deleted = await ctx.channel.purge(limit=amount + 1)
-        try:
-            await ctx.author.send(f"✅ {len(deleted) - 1} mesaj silindi.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"✅ {len(deleted) - 1} mesaj silindi.")
     except discord.Forbidden:
-        try:
-            await ctx.author.send("❌ Mesaj silme yetkim yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Mesaj silme yetkim yok.")
     except Exception as e:
-        try:
-            await ctx.author.send(f"❌ Hata: {e}")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content=f"❌ Hata: {e}")
 
 
 @del_cmd.error
 async def del_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        try:
-            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
-        except discord.Forbidden:
-            pass
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k del number")
 
@@ -361,17 +269,9 @@ async def top_cmd(ctx):
             f"`{i + 1}.` **{name}** — {count:,} mesaj"
             for i, (name, count) in enumerate(top_messages)
         ]
-        embed.add_field(
-            name="💬 En Çok Mesaj Atan Kullanıcılar",
-            value="\n".join(msg_lines),
-            inline=False,
-        )
+        embed.add_field(name="💬 En Çok Mesaj Atan Kullanıcılar", value="\n".join(msg_lines), inline=False)
     else:
-        embed.add_field(
-            name="💬 En Çok Mesaj Atan Kullanıcılar",
-            value="Henüz veri yok.",
-            inline=False,
-        )
+        embed.add_field(name="💬 En Çok Mesaj Atan Kullanıcılar", value="Henüz veri yok.", inline=False)
 
     if top_voice:
         voice_lines = []
@@ -380,17 +280,9 @@ async def top_cmd(ctx):
             hours = seconds // 3600
             minutes = (seconds % 3600) // 60
             voice_lines.append(f"`{i + 1}.` **{name}** — {hours}sa {minutes}dk")
-        embed.add_field(
-            name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar",
-            value="\n".join(voice_lines),
-            inline=False,
-        )
+        embed.add_field(name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar", value="\n".join(voice_lines), inline=False)
     else:
-        embed.add_field(
-            name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar",
-            value="Henüz veri yok.",
-            inline=False,
-        )
+        embed.add_field(name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar", value="Henüz veri yok.", inline=False)
 
     await ctx.send(embed=embed)
 
