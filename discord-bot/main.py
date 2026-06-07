@@ -69,6 +69,8 @@ async def on_message(message):
     if message.author.bot or message.guild is None:
         return
     db.increment_messages(message.guild.id, message.author.id, str(message.author))
+    if "kaan" in message.content.lower():
+        await message.reply("götelek")
     await bot.process_commands(message)
 
 
