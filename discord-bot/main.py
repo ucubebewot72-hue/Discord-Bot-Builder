@@ -135,6 +135,49 @@ async def ban_error(ctx, error):
         await ctx.send("k ban user id")
 
 
+@bot.command(name="unban")
+@commands.has_permissions(ban_members=True)
+async def unban_cmd(ctx, user_id: int):
+    try:
+        user = await bot.fetch_user(user_id)
+        await ctx.guild.unban(user)
+
+        embed = discord.Embed(title="Ban Kaldırıldı", color=discord.Color.green())
+        embed.add_field(name="Kullanıcı", value=f"{user} (ID: `{user_id}`)", inline=False)
+
+        try:
+            await ctx.author.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
+    except discord.NotFound:
+        try:
+            await ctx.author.send(f"❌ `{user_id}` ID'li kullanıcı banlanmış listesinde bulunamadı.")
+        except discord.Forbidden:
+            pass
+    except discord.Forbidden:
+        try:
+            await ctx.author.send("❌ Bu kullanıcının banını kaldırma yetkim yok.")
+        except discord.Forbidden:
+            pass
+    except Exception as e:
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
+
+
+@unban_cmd.error
+async def unban_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
+    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        await ctx.send("k unban user id")
+
+
 @bot.command(name="kick")
 @commands.has_permissions(kick_members=True)
 async def kick_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
