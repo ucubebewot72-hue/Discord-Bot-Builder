@@ -9,7 +9,7 @@ import db
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
-    sys.exit("ERROR: DISCORD_TOKEN environment variable is not set.")
+    sys.exit("HATA: DISCORD_TOKEN ortam değişkeni ayarlanmamış.")
 
 BAN_GIF = "https://tenor.com/view/anime-luminous-luminus-luminas-valentine-gif-2480934953542931736"
 
@@ -24,7 +24,7 @@ bot = commands.Bot(command_prefix="k ", intents=intents)
 @bot.event
 async def on_ready():
     db.init_db()
-    print(f"Bot ready — logged in as {bot.user} (ID: {bot.user.id})")
+    print(f"Bot hazır — {bot.user} olarak giriş yapıldı (ID: {bot.user.id})")
     print("------")
 
 
@@ -49,14 +49,14 @@ async def on_voice_state_update(member, before, after):
 
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
-async def ban_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
+async def ban_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         user = await bot.fetch_user(user_id)
         await ctx.guild.ban(user, reason=reason)
 
-        embed = discord.Embed(title="User Banned", color=discord.Color.red())
-        embed.add_field(name="User", value=f"{user} (ID: `{user_id}`)", inline=False)
-        embed.add_field(name="Reason", value=reason, inline=False)
+        embed = discord.Embed(title="Kullanıcı Banlandı", color=discord.Color.red())
+        embed.add_field(name="Kullanıcı", value=f"{user} (ID: `{user_id}`)", inline=False)
+        embed.add_field(name="Sebep", value=reason, inline=False)
 
         try:
             await ctx.author.send(embed=embed)
@@ -65,67 +65,120 @@ async def ban_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
             pass
 
     except discord.NotFound:
-        await ctx.send(f"❌ No user found with ID `{user_id}`.")
+        try:
+            await ctx.author.send(f"❌ `{user_id}` ID'li bir kullanıcı bulunamadı.")
+        except discord.Forbidden:
+            pass
     except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to ban this user.")
+        try:
+            await ctx.author.send("❌ Bu kullanıcıyı banlama yetkim yok.")
+        except discord.Forbidden:
+            pass
     except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
 
 
 @ban_cmd.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
-        await ctx.send("Usage: k ban user id")
+        await ctx.send("k ban user id")
 
 
 @bot.command(name="kick")
 @commands.has_permissions(kick_members=True)
-async def kick_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
+async def kick_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
         await member.kick(reason=reason)
-        await ctx.send(f"✅ Kicked **{member}** (ID: `{user_id}`)\nReason: {reason}")
+
+        embed = discord.Embed(title="Kullanıcı Atıldı", color=discord.Color.orange())
+        embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
+        embed.add_field(name="Sebep", value=reason, inline=False)
+
+        try:
+            await ctx.author.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
     except discord.NotFound:
-        await ctx.send(f"❌ No member found with ID `{user_id}` in this server.")
+        try:
+            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
+        except discord.Forbidden:
+            pass
     except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to kick this user.")
+        try:
+            await ctx.author.send("❌ Bu kullanıcıyı atma yetkim yok.")
+        except discord.Forbidden:
+            pass
     except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
 
 
 @kick_cmd.error
 async def kick_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
-        await ctx.send("Usage: k kick user id")
+        await ctx.send("k kick user id")
 
 
 @bot.command(name="mute")
 @commands.has_permissions(moderate_members=True)
-async def mute_cmd(ctx, user_id: int, *, reason: str = "No reason provided"):
+async def mute_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
         await member.timeout(timedelta(hours=1), reason=reason)
-        await ctx.send(
-            f"✅ Timed out **{member}** (ID: `{user_id}`) for **1 hour**\nReason: {reason}"
-        )
+
+        embed = discord.Embed(title="Kullanıcı Susturuldu", color=discord.Color.blue())
+        embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
+        embed.add_field(name="Süre", value="1 saat", inline=False)
+        embed.add_field(name="Sebep", value=reason, inline=False)
+
+        try:
+            await ctx.author.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
     except discord.NotFound:
-        await ctx.send(f"❌ No member found with ID `{user_id}` in this server.")
+        try:
+            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
+        except discord.Forbidden:
+            pass
     except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to timeout this user.")
+        try:
+            await ctx.author.send("❌ Bu kullanıcıyı susturma yetkim yok.")
+        except discord.Forbidden:
+            pass
     except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
 
 
 @mute_cmd.error
 async def mute_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
-        await ctx.send("Usage: k mute user id")
+        await ctx.send("k mute user id")
 
 
 @bot.command(name="warn")
@@ -142,21 +195,38 @@ async def warn_cmd(ctx, user_id: int, *, reason: str):
             reason,
         )
         warnings = db.get_warnings(ctx.guild.id, user_id)
-        await ctx.send(
-            f"⚠️ Warned **{member}** (ID: `{user_id}`)\nReason: {reason}\nTotal warnings: **{len(warnings)}**"
-        )
+
+        embed = discord.Embed(title="Kullanıcı Uyarıldı", color=discord.Color.yellow())
+        embed.add_field(name="Kullanıcı", value=f"{member} (ID: `{user_id}`)", inline=False)
+        embed.add_field(name="Sebep", value=reason, inline=False)
+        embed.add_field(name="Toplam Uyarı", value=str(len(warnings)), inline=False)
+
+        try:
+            await ctx.author.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
     except discord.NotFound:
-        await ctx.send(f"❌ No member found with ID `{user_id}` in this server.")
+        try:
+            await ctx.author.send(f"❌ `{user_id}` ID'li bir üye bu sunucuda bulunamadı.")
+        except discord.Forbidden:
+            pass
     except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
+        try:
+            await ctx.author.send(f"❌ Hata: {e}")
+        except discord.Forbidden:
+            pass
 
 
 @warn_cmd.error
 async def warn_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
+        try:
+            await ctx.author.send("❌ Bu komutu kullanma yetkiniz yok.")
+        except discord.Forbidden:
+            pass
     elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
-        await ctx.send("Usage: k warn user id reason")
+        await ctx.send("k warn user id reason")
 
 
 @bot.command(name="top")
@@ -164,19 +234,23 @@ async def top_cmd(ctx):
     top_messages = db.get_top_messages(ctx.guild.id, limit=5)
     top_voice = db.get_top_voice(ctx.guild.id, limit=5)
 
-    embed = discord.Embed(title="🏆 Server Leaderboard", color=discord.Color.gold())
+    embed = discord.Embed(title="🏆 Sunucu Sıralaması", color=discord.Color.gold())
 
     if top_messages:
         msg_lines = [
-            f"`{i + 1}.` **{name}** — {count:,} messages"
+            f"`{i + 1}.` **{name}** — {count:,} mesaj"
             for i, (name, count) in enumerate(top_messages)
         ]
         embed.add_field(
-            name="💬 Top Message Senders", value="\n".join(msg_lines), inline=False
+            name="💬 En Çok Mesaj Atan Kullanıcılar",
+            value="\n".join(msg_lines),
+            inline=False,
         )
     else:
         embed.add_field(
-            name="💬 Top Message Senders", value="No data yet.", inline=False
+            name="💬 En Çok Mesaj Atan Kullanıcılar",
+            value="Henüz veri yok.",
+            inline=False,
         )
 
     if top_voice:
@@ -185,13 +259,17 @@ async def top_cmd(ctx):
             seconds = int(seconds)
             hours = seconds // 3600
             minutes = (seconds % 3600) // 60
-            voice_lines.append(f"`{i + 1}.` **{name}** — {hours}h {minutes}m")
+            voice_lines.append(f"`{i + 1}.` **{name}** — {hours}sa {minutes}dk")
         embed.add_field(
-            name="🎙️ Top Voice Activity", value="\n".join(voice_lines), inline=False
+            name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar",
+            value="\n".join(voice_lines),
+            inline=False,
         )
     else:
         embed.add_field(
-            name="🎙️ Top Voice Activity", value="No data yet.", inline=False
+            name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar",
+            value="Henüz veri yok.",
+            inline=False,
         )
 
     await ctx.send(embed=embed)
