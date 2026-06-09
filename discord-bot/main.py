@@ -93,14 +93,16 @@ async def join_kaine():
     if not channel or not isinstance(channel, discord.VoiceChannel):
         print(f"Ses kanalı bulunamadı (ID: {VOICE_CHANNEL_ID})")
         return
-    vc = channel.guild.voice_client
+    guild = channel.guild
+    vc = guild.voice_client
     if vc and vc.is_connected():
         if vc.channel.id != VOICE_CHANNEL_ID:
             await vc.move_to(channel)
+        await guild.change_voice_state(channel=channel, self_mute=True, self_deaf=True)
     else:
         try:
-            await channel.connect()
-            print(f"'{channel.name}' ses kanalına bağlanıldı")
+            await channel.connect(self_mute=True, self_deaf=True)
+            print(f"'{channel.name}' ses kanalına bağlanıldı (sessiz/sağır)")
         except Exception as e:
             print(f"Ses kanalına bağlanılamadı: {e}")
 
