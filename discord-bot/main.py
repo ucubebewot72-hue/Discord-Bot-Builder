@@ -314,16 +314,17 @@ async def top_cmd(ctx):
     top_messages = db.get_top_messages(ctx.guild.id, limit=5)
     top_voice = db.get_top_voice(ctx.guild.id, limit=5)
 
-    embed = discord.Embed(title="🏆 Sunucu Sıralaması", color=0xFFFFFF)
+    E = "<:b7118fea635f3ddf57297e789e5c9606:1510221637604085830>"
+    embed = discord.Embed(title=f"{E} Sunucu Sıralaması", color=0xFFFFFF)
 
     if top_messages:
         msg_lines = [
             f"`{i + 1}.` **{name}** — {count:,} mesaj"
             for i, (name, count) in enumerate(top_messages)
         ]
-        embed.add_field(name="💬 En Çok Mesaj Atan Kullanıcılar", value="\n".join(msg_lines), inline=False)
+        embed.add_field(name=f"{E} En Çok Mesaj Atan Kullanıcılar", value="\n".join(msg_lines), inline=False)
     else:
-        embed.add_field(name="💬 En Çok Mesaj Atan Kullanıcılar", value="Henüz veri yok.", inline=False)
+        embed.add_field(name=f"{E} En Çok Mesaj Atan Kullanıcılar", value="Henüz veri yok.", inline=False)
 
     if top_voice:
         voice_lines = []
@@ -332,9 +333,9 @@ async def top_cmd(ctx):
             hours = seconds // 3600
             minutes = (seconds % 3600) // 60
             voice_lines.append(f"`{i + 1}.` **{name}** — {hours}sa {minutes}dk")
-        embed.add_field(name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar", value="\n".join(voice_lines), inline=False)
+        embed.add_field(name=f"{E} En Çok Ses Kanalında Bulunan Kullanıcılar", value="\n".join(voice_lines), inline=False)
     else:
-        embed.add_field(name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar", value="Henüz veri yok.", inline=False)
+        embed.add_field(name=f"{E} En Çok Ses Kanalında Bulunan Kullanıcılar", value="Henüz veri yok.", inline=False)
 
     embed.set_image(url="attachment://top.gif")
 
