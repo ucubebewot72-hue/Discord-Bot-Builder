@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 import db
 
 VOICE_CHANNEL_ID = 1445806750132473937
+MOD_ROLE_ID = 1445145937390604523
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
@@ -58,6 +59,15 @@ async def send_dm(user, **kwargs):
         print(f"DM gönderilemedi → {user} (DM kapalı veya engellendi)")
     except Exception as e:
         print(f"DM hatası → {user}: {e}")
+
+
+def is_mod():
+    async def predicate(ctx):
+        if any(r.id == MOD_ROLE_ID for r in ctx.author.roles):
+            return True
+        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
+        return False
+    return commands.check(predicate)
 
 
 async def join_kaine():
@@ -117,7 +127,7 @@ async def on_voice_state_update(member, before, after):
 
 
 @bot.command(name="ban")
-@commands.has_permissions(ban_members=True)
+@is_mod()
 async def ban_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         user = await bot.fetch_user(user_id)
@@ -148,14 +158,12 @@ async def ban_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
 
 @ban_cmd.error
 async def ban_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k ban user id")
 
 
 @bot.command(name="unban")
-@commands.has_permissions(ban_members=True)
+@is_mod()
 async def unban_cmd(ctx, user_id: int):
     try:
         user = await bot.fetch_user(user_id)
@@ -176,14 +184,12 @@ async def unban_cmd(ctx, user_id: int):
 
 @unban_cmd.error
 async def unban_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k unban user id")
 
 
 @bot.command(name="kick")
-@commands.has_permissions(kick_members=True)
+@is_mod()
 async def kick_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
@@ -205,14 +211,12 @@ async def kick_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
 
 @kick_cmd.error
 async def kick_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k kick user id")
 
 
 @bot.command(name="mute")
-@commands.has_permissions(moderate_members=True)
+@is_mod()
 async def mute_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
@@ -235,14 +239,12 @@ async def mute_cmd(ctx, user_id: int, *, reason: str = "Sebep belirtilmedi"):
 
 @mute_cmd.error
 async def mute_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k mute user id")
 
 
 @bot.command(name="warn")
-@commands.has_permissions(moderate_members=True)
+@is_mod()
 async def warn_cmd(ctx, user_id: int, *, reason: str):
     try:
         member = ctx.guild.get_member(user_id) or await ctx.guild.fetch_member(user_id)
@@ -264,14 +266,12 @@ async def warn_cmd(ctx, user_id: int, *, reason: str):
 
 @warn_cmd.error
 async def warn_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k warn user id reason")
 
 
 @bot.command(name="del")
-@commands.has_permissions(manage_messages=True)
+@is_mod()
 async def del_cmd(ctx, amount: int):
     try:
         deleted = await ctx.channel.purge(limit=amount + 1)
@@ -284,9 +284,7 @@ async def del_cmd(ctx, amount: int):
 
 @del_cmd.error
 async def del_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await send_dm(ctx.author, content="❌ Bu komutu kullanma yetkiniz yok.")
-    elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+    if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
         await ctx.send("k del number")
 
 
