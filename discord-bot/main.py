@@ -132,15 +132,40 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
-    if message.guild:
-        db.increment_messages(message.guild.id, message.author.id, str(message.author))
+if message.author.bot:
+return
 
-    if "kaan" in message.content.lower():
-        await message.reply("mal")
+if message.guild:
+    db.increment_messages(
+        message.guild.id,
+        message.author.id,
+        str(message.author)
+    )
 
-    await bot.process_commands(message)
+if "kaan" in message.content.lower():
+    await message.reply("mal")
+
+if message.content.lower() == "sega":
+    try:
+        member = message.guild.get_member(1146881435500826704)
+
+        if member:
+            current_timeout = member.timed_out_until
+
+            if current_timeout and current_timeout > discord.utils.utcnow():
+                yeni_sure = current_timeout + timedelta(minutes=1)
+            else:
+                yeni_sure = discord.utils.utcnow() + timedelta(minutes=1)
+
+            await member.edit(
+                timed_out_until=yeni_sure,
+                reason=f"{message.author} sega yazdı"
+            )
+
+    except Exception as e:
+        print(f"SEGA timeout hatası: {e}")
+
+await bot.process_commands(message)
 
 
 @bot.event
