@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 
 import db
 
-VOICE_CHANNEL_NAME = "kaine"
+VOICE_CHANNEL_ID = 1445806750132473937
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
@@ -61,19 +61,20 @@ async def send_dm(user, **kwargs):
 
 
 async def join_kaine():
-    for guild in bot.guilds:
-        channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
-        if channel:
-            vc = guild.voice_client
-            if vc and vc.is_connected():
-                if vc.channel.id != channel.id:
-                    await vc.move_to(channel)
-            else:
-                try:
-                    await channel.connect()
-                    print(f"'{VOICE_CHANNEL_NAME}' ses kanalına bağlanıldı ({guild.name})")
-                except Exception as e:
-                    print(f"Ses kanalına bağlanılamadı ({guild.name}): {e}")
+    channel = bot.get_channel(VOICE_CHANNEL_ID)
+    if not channel or not isinstance(channel, discord.VoiceChannel):
+        print(f"Ses kanalı bulunamadı (ID: {VOICE_CHANNEL_ID})")
+        return
+    vc = channel.guild.voice_client
+    if vc and vc.is_connected():
+        if vc.channel.id != VOICE_CHANNEL_ID:
+            await vc.move_to(channel)
+    else:
+        try:
+            await channel.connect()
+            print(f"'{channel.name}' ses kanalına bağlanıldı")
+        except Exception as e:
+            print(f"Ses kanalına bağlanılamadı: {e}")
 
 
 @tasks.loop(seconds=30)
