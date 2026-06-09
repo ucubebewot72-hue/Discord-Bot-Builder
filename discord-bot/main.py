@@ -52,6 +52,24 @@ async def download_ban_gif():
         print(f"GIF indirme hatası: {e}")
 
 
+AVATAR_PATH = "avatar.jpg"
+_avatar_set = False
+
+async def set_avatar():
+    global _avatar_set
+    if _avatar_set:
+        return
+    try:
+        with open(AVATAR_PATH, "rb") as f:
+            await bot.user.edit(avatar=f.read())
+        _avatar_set = True
+        print("Bot avatarı güncellendi.")
+    except FileNotFoundError:
+        print("avatar.jpg bulunamadı, atlandı.")
+    except Exception as e:
+        print(f"Avatar güncellenemedi: {e}")
+
+
 async def send_dm(user, **kwargs):
     try:
         await user.send(**kwargs)
@@ -101,6 +119,7 @@ async def before_keepalive():
 async def on_ready():
     db.init_db()
     await download_ban_gif()
+    await set_avatar()
     await join_kaine()
     if not voice_keepalive.is_running():
         voice_keepalive.start()
