@@ -142,13 +142,19 @@ def get_top_messages(guild_id, limit=5):
 
 
 def get_top_voice(guild_id, limit=5):
+    import time as _time
     with get_conn() as conn:
         return conn.execute(
             """
-            SELECT username, total_seconds FROM voice_sessions
+            SELECT username,
+                   total_seconds + CASE
+                       WHEN join_time IS NOT NULL THEN MAX(0, ? - join_time)
+                       ELSE 0
+                   END AS effective_seconds
+            FROM voice_sessions
             WHERE guild_id = ?
-            ORDER BY total_seconds DESC
+            ORDER BY effective_seconds DESC
             LIMIT ?
         """,
-            (str(guild_id), limit),
+            (_time.time(), str(guild_id), limit),
         ).fetchall()

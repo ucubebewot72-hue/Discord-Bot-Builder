@@ -120,6 +120,8 @@ async def on_message(message):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
+    if member.bot:
+        return
     if before.channel is None and after.channel is not None:
         db.record_voice_join(member.guild.id, member.id, str(member))
     elif before.channel is not None and after.channel is None:
