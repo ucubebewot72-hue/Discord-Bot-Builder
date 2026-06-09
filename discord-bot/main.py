@@ -122,6 +122,14 @@ async def on_ready():
     db.init_db()
     await download_ban_gif()
     await set_avatar()
+    await bot.change_presence(
+        status=discord.Status.online,
+        activity=discord.Game(name="discord.gg/steamart"),
+    )
+    try:
+        await bot.user.edit(bio="discord.gg/steamart")
+    except Exception:
+        pass
     await join_kaine()
     if not voice_keepalive.is_running():
         voice_keepalive.start()
