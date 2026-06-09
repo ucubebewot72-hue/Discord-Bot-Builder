@@ -314,7 +314,7 @@ async def top_cmd(ctx):
     top_messages = db.get_top_messages(ctx.guild.id, limit=5)
     top_voice = db.get_top_voice(ctx.guild.id, limit=5)
 
-    embed = discord.Embed(title="🏆 Sunucu Sıralaması", color=discord.Color.gold())
+    embed = discord.Embed(title="🏆 Sunucu Sıralaması", color=0xFFFFFF)
 
     if top_messages:
         msg_lines = [
@@ -336,7 +336,10 @@ async def top_cmd(ctx):
     else:
         embed.add_field(name="🎙️ En Çok Ses Kanalında Bulunan Kullanıcılar", value="Henüz veri yok.", inline=False)
 
-    await ctx.send(embed=embed)
+    embed.set_image(url="attachment://top.gif")
+
+    gif_file = discord.File("top.gif", filename="top.gif")
+    await ctx.send(embed=embed, file=gif_file)
 
 
 bot.run(TOKEN)
