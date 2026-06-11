@@ -2,11 +2,13 @@ import asyncio
 import os
 import re
 import sys
+import json
 from datetime import timedelta
 
 import aiohttp
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands
 
 import db
 
@@ -20,13 +22,38 @@ if not TOKEN:
 TENOR_PAGE_URL = "https://tenor.com/view/anime-luminous-luminus-luminas-valentine-gif-2480934953542931736"
 BAN_GIF_PATH = "ban.gif"
 
+EMOTE_DB_FILE = "emotes.json"
+
+
+# ---------------- EMOTE SYSTEM ----------------
+
+def load_emotes():
+    if not os.path.exists(EMOTE_DB_FILE):
+        return {}
+    with open(EMOTE_DB_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_emotes(data):
+    with open(EMOTE_DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+emotes = load_emotes()
+
+
+# ---------------- BOT SETUP ----------------
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.voice_states = True
 
 bot = commands.Bot(command_prefix="k ", intents=intents)
+tree = bot.tree
 
+
+# ---------------- GIF DOWNLOAD ----------------
 
 async def download_ban_gif():
     if os.path.exists(BAN_GIF_PATH):
@@ -50,20 +77,7 @@ async def download_ban_gif():
         print(f"GIF hata: {e}")
 
 
-AVATAR_PATH = "avatar.jpg"
-_avatar_set = False
-
-async def set_avatar():
-    global _avatar_set
-    if _avatar_set:
-        return
-    try:
-        with open(AVATAR_PATH, "rb") as f:
-            await bot.user.edit(avatar=f.read())
-        _avatar_set = True
-    except:
-        pass
-
+# ---------------- MOD CHECK ----------------
 
 async def send_dm(user, **kwargs):
     try:
@@ -80,6 +94,58 @@ def is_mod():
         return False
     return commands.check(predicate)
 
+
+# ---------------- EMOTE SLASH COMMAND ----------------
+
+class EmoteGroup(app_commands.Group):
+    def __init__(self):
+        super().__init__(name="emote", description="Emote sistemi")
+
+    @app_commands.command(name="add", description="Yeni emote ekle")
+    @app_commands.describe(name="Emote ismi", url="GIF veya görsel URL (opsiyonel)")
+    async def add(self, interaction: discord.Interaction, name: str, url: str = None):
+        attachment_url = None
+
+        if interaction.message and interaction.message.attachments:
+            attachment_url = interaction.message.attachments[0].url
+
+        if interaction.data.get("resolved", {}).get("attachments"):
+            for att in interaction.data["resolved"]["attachments"].values():
+                attachment_url = att["url"]
+
+        final_url = url or attachment_url
+
+        if not final_url:
+            await interaction.response.send_message("❌ GIF veya foto göndermelisin!", ephemeral=True)
+            return
+
+        emotes[name.lower()] = final_url
+        save_emotes(emotes)
+
+        await interaction.response.send_message(f"✅ Emote eklendi: `{name}`")
+
+
+tree.add_command(EmoteGroup())
+
+
+# ---------------- EMOTE SEND COMMAND ----------------
+
+@tree.command(name="emote", description="Emote gönder")
+@app_commands.describe(name="Emote ismi")
+async def emote_send(interaction: discord.Interaction, name: str):
+    url = emotes.get(name.lower())
+
+    if not url:
+        await interaction.response.send_message("❌ Emote bulunamadı", ephemeral=True)
+        return
+
+    embed = discord.Embed()
+    embed.set_image(url=url)
+
+    await interaction.response.send_message(embed=embed)
+
+
+# ---------------- VOICE ----------------
 
 async def join_voice():
     channel = bot.get_channel(VOICE_CHANNEL_ID)
@@ -103,13 +169,13 @@ async def voice_keepalive():
     await join_voice()
 
 
+# ---------------- READY ----------------
+
 @bot.event
 async def on_ready():
     db.init_db()
     await download_ban_gif()
-    await set_avatar()
 
-    # ✅ DÜZELTİLMİŞ STATUS
     await bot.change_presence(
         status=discord.Status.online,
         activity=discord.Activity(
@@ -127,91 +193,26 @@ async def on_ready():
     if not voice_keepalive.is_running():
         voice_keepalive.start()
 
+    await tree.sync()
+
     print(f"Bot hazır: {bot.user}")
 
 
+# ---------------- MESSAGE EVENTS ----------------
+
 @bot.event
 async def on_message(message):
-if message.author.bot:
-return
-
-if message.guild:
-    db.increment_messages(
-        message.guild.id,
-        message.author.id,
-        str(message.author)
-    )
-
-if "kaan" in message.content.lower():
-    await message.reply("mal")
-
-if message.content.lower() == "sega":
-    try:
-        member = message.guild.get_member(1146881435500826704)
-
-        if member:
-            current_timeout = member.timed_out_until
-
-            if current_timeout and current_timeout > discord.utils.utcnow():
-                yeni_sure = current_timeout + timedelta(minutes=1)
-            else:
-                yeni_sure = discord.utils.utcnow() + timedelta(minutes=1)
-
-            await member.edit(
-                timed_out_until=yeni_sure,
-                reason=f"{message.author} sega yazdı"
-            )
-
-    except Exception as e:
-        print(f"SEGA timeout hatası: {e}")
-
-await bot.process_commands(message)
-
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    if member.bot:
+    if message.author.bot:
         return
 
-    if before.channel is None and after.channel:
-        db.record_voice_join(member.guild.id, member.id, str(member))
-    elif before.channel and after.channel is None:
-        db.record_voice_leave(member.guild.id, member.id)
+    if message.guild:
+        db.increment_messages(
+            message.guild.id,
+            message.author.id,
+            str(message.author)
+        )
 
-
-# ---------------- COMMANDS ----------------
-
-@bot.command(name="ban")
-@is_mod()
-async def ban_cmd(ctx, user_id: int, *, reason="Sebep yok"):
-    user = await bot.fetch_user(user_id)
-    await ctx.guild.ban(user, reason=reason)
-    await ctx.send("✅ banlandı")
-
-
-@bot.command(name="kick")
-@is_mod()
-async def kick_cmd(ctx, user_id: int, *, reason="Sebep yok"):
-    member = ctx.guild.get_member(user_id)
-    if member:
-        await member.kick(reason=reason)
-        await ctx.send("✅ kicklendi")
-
-
-@bot.command(name="mute")
-@is_mod()
-async def mute_cmd(ctx, user_id: int):
-    member = ctx.guild.get_member(user_id)
-    if member:
-        await member.timeout(timedelta(hours=1))
-        await ctx.send("✅ mute")
-
-
-@bot.command(name="del")
-@is_mod()
-async def del_cmd(ctx, amount: int):
-    await ctx.channel.purge(limit=amount + 1)
-    await ctx.send("✅ silindi", delete_after=2)
+    await bot.process_commands(message)
 
 
 # ---------------- RUN ----------------
