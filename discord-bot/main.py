@@ -15,7 +15,7 @@ import db
 VOICE_CHANNEL_ID = 1445806750132473937
 MOD_ROLE_ID = 1445145937390604523
 
-TOKEN = os.getenv("MTUxMTQyMjg0OTUyNzcwOTcxNg.GZxWvh.wOm9M2c39saSNuqlUK8ejBGvDKScLBj29arv1s")
+TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     sys.exit("HATA: DISCORD_TOKEN ortam değişkeni ayarlanmamış.")
 
