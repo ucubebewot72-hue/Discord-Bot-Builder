@@ -96,7 +96,7 @@ def is_mod():
     return commands.check(predicate)
 
 
-# ---------------- EMOTE SYSTEM (FIXED) ----------------
+# ---------------- EMOTE ADD ----------------
 
 @tree.command(name="emote_add", description="Emote ekle")
 @app_commands.describe(name="isim", url="gif link")
@@ -106,6 +106,8 @@ async def emote_add(interaction: discord.Interaction, name: str, url: str):
 
     await interaction.response.send_message(f"✅ Emote eklendi: {name}")
 
+
+# ---------------- EMOTE SEND ----------------
 
 @tree.command(name="emote", description="Emote gönder")
 @app_commands.describe(name="emote ismi")
@@ -120,6 +122,28 @@ async def emote_send(interaction: discord.Interaction, name: str):
     embed.set_image(url=url)
 
     await interaction.response.send_message(embed=embed)
+
+
+# ---------------- SEGA ANTI ABUSE (FIXED) ----------------
+# artık sadece LOG atar, kimseyi mute'lamaz
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    if message.guild:
+        db.increment_messages(
+            message.guild.id,
+            message.author.id,
+            str(message.author)
+        )
+
+    # ❌ SEGA MUTE KALDIRILDI (güvenli hale getirildi)
+    if message.content.lower() == "sega":
+        print(f"[SEGA DETECTED] {message.author} yazdı ama işlem yapılmadı.")
+
+    await bot.process_commands(message)
 
 
 # ---------------- VOICE ----------------
@@ -174,23 +198,6 @@ async def on_ready():
     await tree.sync()
 
     print(f"Bot hazır: {bot.user}")
-
-
-# ---------------- EVENTS ----------------
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    if message.guild:
-        db.increment_messages(
-            message.guild.id,
-            message.author.id,
-            str(message.author)
-        )
-
-    await bot.process_commands(message)
 
 
 # ---------------- RUN ----------------
