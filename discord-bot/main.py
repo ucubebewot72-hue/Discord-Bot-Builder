@@ -56,61 +56,44 @@ bot = commands.Bot(command_prefix="k ", intents=intents)
 tree = bot.tree
 
 
-# ---------------- BAN GIF ----------------
-
-async def download_ban_gif():
-    if os.path.exists(BAN_GIF_PATH):
-        return
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(TENOR_PAGE_URL) as resp:
-                html = await resp.text()
-
-            match = re.search(r'"url"\s*:\s*"(https://media\.tenor\.com/[^"]+\.gif)"', html)
-
-            if match:
-                gif_url = match.group(1)
-                async with session.get(gif_url) as gif_resp:
-                    if gif_resp.status == 200:
-                        with open(BAN_GIF_PATH, "wb") as f:
-                            f.write(await gif_resp.read())
-    except Exception as e:
-        print(f"GIF hata: {e}")
-
-
 # ---------------- MOD CHECK ----------------
 
-async def send_dm(user, **kwargs):
-    try:
-        await user.send(**kwargs)
-    except:
-        pass
+def is_mod(member: discord.Member):
+    return any(r.id == MOD_ROLE_ID for r in member.roles)
 
 
-def is_mod():
-    async def predicate(ctx):
-        if any(r.id == MOD_ROLE_ID for r in ctx.author.roles):
-            return True
-        await send_dm(ctx.author, content="❌ Yetkin yok.")
-        return False
-    return commands.check(predicate)
+# ---------------- DELETE COMMAND ----------------
+
+@bot.command(name="del")
+async def delete_cmd(ctx, amount: int):
+    if not is_mod(ctx.author):
+        return
+
+    if amount <= 0:
+        return await ctx.send("❌ Geçersiz sayı")
+
+    if amount > 100:
+        amount = 100
+
+    deleted = await ctx.channel.purge(limit=amount + 1)
+
+    msg = await ctx.send(f"🧹 {len(deleted)-1} mesaj silindi")
+    await asyncio.sleep(2)
+    await msg.delete()
 
 
 # ---------------- EMOTE ADD ----------------
 
 @tree.command(name="emote_add", description="Emote ekle")
-@app_commands.describe(name="isim", url="gif link")
 async def emote_add(interaction: discord.Interaction, name: str, url: str):
     emotes[name.lower()] = url
     save_emotes(emotes)
-
     await interaction.response.send_message(f"✅ Emote eklendi: {name}")
 
 
 # ---------------- EMOTE SEND ----------------
 
 @tree.command(name="emote", description="Emote gönder")
-@app_commands.describe(name="emote ismi")
 async def emote_send(interaction: discord.Interaction, name: str):
     url = emotes.get(name.lower())
 
@@ -120,30 +103,7 @@ async def emote_send(interaction: discord.Interaction, name: str):
 
     embed = discord.Embed()
     embed.set_image(url=url)
-
     await interaction.response.send_message(embed=embed)
-
-
-# ---------------- SEGA ANTI ABUSE (FIXED) ----------------
-# artık sadece LOG atar, kimseyi mute'lamaz
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    if message.guild:
-        db.increment_messages(
-            message.guild.id,
-            message.author.id,
-            str(message.author)
-        )
-
-    # ❌ SEGA MUTE KALDIRILDI (güvenli hale getirildi)
-    if message.content.lower() == "sega":
-        print(f"[SEGA DETECTED] {message.author} yazdı ama işlem yapılmadı.")
-
-    await bot.process_commands(message)
 
 
 # ---------------- VOICE ----------------
@@ -175,7 +135,6 @@ async def voice_keepalive():
 @bot.event
 async def on_ready():
     db.init_db()
-    await download_ban_gif()
 
     await bot.change_presence(
         status=discord.Status.online,
