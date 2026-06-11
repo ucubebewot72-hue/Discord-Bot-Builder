@@ -25,13 +25,16 @@ BAN_GIF_PATH = "ban.gif"
 EMOTE_DB_FILE = "emotes.json"
 
 
-# ---------------- EMOTE SYSTEM ----------------
+# ---------------- EMOTES ----------------
 
 def load_emotes():
     if not os.path.exists(EMOTE_DB_FILE):
         return {}
-    with open(EMOTE_DB_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(EMOTE_DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
 
 
 def save_emotes(data):
@@ -42,7 +45,7 @@ def save_emotes(data):
 emotes = load_emotes()
 
 
-# ---------------- BOT SETUP ----------------
+# ---------------- BOT ----------------
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -53,7 +56,7 @@ bot = commands.Bot(command_prefix="k ", intents=intents)
 tree = bot.tree
 
 
-# ---------------- GIF DOWNLOAD ----------------
+# ---------------- BAN GIF ----------------
 
 async def download_ban_gif():
     if os.path.exists(BAN_GIF_PATH):
@@ -64,8 +67,6 @@ async def download_ban_gif():
                 html = await resp.text()
 
             match = re.search(r'"url"\s*:\s*"(https://media\.tenor\.com/[^"]+\.gif)"', html)
-            if not match:
-                match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
 
             if match:
                 gif_url = match.group(1)
@@ -95,48 +96,24 @@ def is_mod():
     return commands.check(predicate)
 
 
-# ---------------- EMOTE SLASH COMMAND ----------------
+# ---------------- EMOTE SYSTEM (FIXED) ----------------
 
-class EmoteGroup(app_commands.Group):
-    def __init__(self):
-        super().__init__(name="emote", description="Emote sistemi")
+@tree.command(name="emote_add", description="Emote ekle")
+@app_commands.describe(name="isim", url="gif link")
+async def emote_add(interaction: discord.Interaction, name: str, url: str):
+    emotes[name.lower()] = url
+    save_emotes(emotes)
 
-    @app_commands.command(name="add", description="Yeni emote ekle")
-    @app_commands.describe(name="Emote ismi", url="GIF veya görsel URL (opsiyonel)")
-    async def add(self, interaction: discord.Interaction, name: str, url: str = None):
-        attachment_url = None
+    await interaction.response.send_message(f"✅ Emote eklendi: {name}")
 
-        if interaction.message and interaction.message.attachments:
-            attachment_url = interaction.message.attachments[0].url
-
-        if interaction.data.get("resolved", {}).get("attachments"):
-            for att in interaction.data["resolved"]["attachments"].values():
-                attachment_url = att["url"]
-
-        final_url = url or attachment_url
-
-        if not final_url:
-            await interaction.response.send_message("❌ GIF veya foto göndermelisin!", ephemeral=True)
-            return
-
-        emotes[name.lower()] = final_url
-        save_emotes(emotes)
-
-        await interaction.response.send_message(f"✅ Emote eklendi: `{name}`")
-
-
-tree.add_command(EmoteGroup())
-
-
-# ---------------- EMOTE SEND COMMAND ----------------
 
 @tree.command(name="emote", description="Emote gönder")
-@app_commands.describe(name="Emote ismi")
+@app_commands.describe(name="emote ismi")
 async def emote_send(interaction: discord.Interaction, name: str):
     url = emotes.get(name.lower())
 
     if not url:
-        await interaction.response.send_message("❌ Emote bulunamadı", ephemeral=True)
+        await interaction.response.send_message("❌ Emote yok", ephemeral=True)
         return
 
     embed = discord.Embed()
@@ -190,6 +167,7 @@ async def on_ready():
         pass
 
     await join_voice()
+
     if not voice_keepalive.is_running():
         voice_keepalive.start()
 
@@ -198,7 +176,7 @@ async def on_ready():
     print(f"Bot hazır: {bot.user}")
 
 
-# ---------------- MESSAGE EVENTS ----------------
+# ---------------- EVENTS ----------------
 
 @bot.event
 async def on_message(message):
